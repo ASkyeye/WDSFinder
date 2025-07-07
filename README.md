@@ -7,7 +7,7 @@ WDSFinder is a tool to identify WDS servers in an Active Directory domain and en
 More explains is these two blog posts :
 
 - https://trustedsec.com/blog/red-team-gold-extracting-credentials-from-mdt-shares
-- 
+- https://hideandsec.sh/books/windows-sNL/page/mdt-where-are-you
 
 ## Why Rust ?
 
