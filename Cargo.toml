@@ -1,0 +1,13 @@
+[package]
+name = "WDSFinder"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ldap3 = "0.11.5"
+clap = { version = "4.5.40", features = ["derive"] }
+log = "0.4.27"
+simple_logger = "5.0.0"
+
+[dev-dependencies]
+tokio-test = "0.4.4"
