@@ -4,7 +4,7 @@
 
 WDSFinder is a tool to identify WDS servers in an Active Directory domain and enumerate their exposed SMB shares. WDS servers can be used with SCCM Distribution Points and MDT shares, which are great targets to retrieve sensitive data like credentials.
 
-More explains is these two blog posts :
+More details about this in these two blog posts :
 
 - https://trustedsec.com/blog/red-team-gold-extracting-credentials-from-mdt-shares
 - https://hideandsec.sh/books/windows-sNL/page/mdt-where-are-you
