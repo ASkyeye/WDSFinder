@@ -2,7 +2,6 @@ use std::error::Error;
 use std::process::Command;
 use std::str;
 
-
 // SMB structure
 #[derive(Debug, Clone)]
 pub struct SmbConfig {
@@ -50,17 +49,24 @@ impl SmbClient {
 
     // Uses smbclient to list available shares on the SMB server - only works Linux
     pub fn list_shares(&self) -> Result<Vec<SmbShare>, Box<dyn Error>> {
-        log::debug!("SMB connextion to {}:{}", self.config.server_ip, self.config.port);
+        log::debug!(
+            "SMB connextion to {}:{}",
+            self.config.server_ip,
+            self.config.port
+        );
 
         // Contrusts the smbclient command to list shares
         let mut cmd = Command::new("smbclient");
         cmd.arg("-L")
-           .arg(&self.config.server_ip)
-           .arg("-U")
-           .arg(format!("{}\\{}%{}", self.config.domain, self.config.username, self.config.password))
-           .arg("-p")
-           .arg(&self.config.port.to_string())
-           .arg("--option=client min protocol=NT1"); // Retrocompatibility with older SMB versions
+            .arg(&self.config.server_ip)
+            .arg("-U")
+            .arg(format!(
+                "{}\\{}%{}",
+                self.config.domain, self.config.username, self.config.password
+            ))
+            .arg("-p")
+            .arg(&self.config.port.to_string())
+            .arg("--option=client min protocol=NT1"); // Retrocompatibility with older SMB versions
 
         let output = cmd.output()?;
 
@@ -80,7 +86,7 @@ impl SmbClient {
 
         for line in output.lines() {
             let line = line.trim();
-            
+
             // Detect the start of the shares section
             if line.contains("Sharename") && line.contains("Type") {
                 in_shares_section = true;
@@ -127,16 +133,23 @@ impl SmbClient {
 
     // Test the SMB connection
     pub fn test_connection(&self) -> Result<bool, Box<dyn Error>> {
-        log::debug!("Test the SMB connection with {}:{}", self.config.server_ip, self.config.port);
+        log::debug!(
+            "Test the SMB connection with {}:{}",
+            self.config.server_ip,
+            self.config.port
+        );
 
         let mut cmd = Command::new("smbclient");
         cmd.arg("-L")
-           .arg(&self.config.server_ip)
-           .arg("-U")
-           .arg(format!("{}\\{}%{}", self.config.domain, self.config.username, self.config.password))
-           .arg("-p")
-           .arg(&self.config.port.to_string())
-           .arg("--option=client min protocol=NT1");
+            .arg(&self.config.server_ip)
+            .arg("-U")
+            .arg(format!(
+                "{}\\{}%{}",
+                self.config.domain, self.config.username, self.config.password
+            ))
+            .arg("-p")
+            .arg(&self.config.port.to_string())
+            .arg("--option=client min protocol=NT1");
 
         let output = cmd.output()?;
         Ok(output.status.success())
@@ -172,13 +185,13 @@ impl SmbClient {
     // Parse the output of the directory listing command
     fn parse_directory_listing(&self, output: &str) -> Vec<String> {
         let mut files = Vec::new();
-        
+
         for line in output.lines() {
             let line = line.trim();
             if line.is_empty() || line.starts_with("smb:") || line.contains("blocks available") {
                 continue;
             }
-            
+
             // Format typique: "  nom_fichier    A    taille  date"
             if let Some(filename) = line.split_whitespace().next() {
                 if filename != "." && filename != ".." {
@@ -186,7 +199,7 @@ impl SmbClient {
                 }
             }
         }
-        
+
         files
     }*/
 }

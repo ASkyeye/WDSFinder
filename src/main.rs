@@ -1,22 +1,19 @@
 mod ldap_utils;
 mod smb_utils;
 
-use ldap3::{SearchEntry};
-use ldap_utils::{LdapConfig, LdapClient, print_search_results, domain_to_base_dn};
-use smb_utils::{SmbClient, SmbConfig, print_shares/*, print_share_content*/};
+use ldap3::SearchEntry;
+use ldap_utils::{domain_to_base_dn, print_search_results, LdapClient, LdapConfig};
 
-use std::error::Error;
 use clap::{Arg, Command};
 use log::LevelFilter;
 use simple_logger::SimpleLogger;
-
+use std::error::Error;
 
 fn extract_cn_value(dn: &str) -> Option<String> {
     dn.strip_prefix("CN=")
         .and_then(|s| s.split(',').next())
         .map(|s| s.to_string())
 }
-
 
 fn main() -> Result<(), Box<dyn Error>> {
     SimpleLogger::new()
@@ -26,10 +23,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         .unwrap();
     ::log::set_max_level(LevelFilter::Info);
 
-    // Command line argument parsing 
+    // Command line argument parsing
     let args = Command::new("WDS Server Search")
         .author("BlackWasp")
-        .version("0.1.0")
+        .version("0.1.1")
         .arg(
             Arg::new("username")
                 .short('u')
@@ -49,13 +46,30 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .short('i')
                 .long("ip")
                 .required(true)
-                .help("IP address of the LDAP server"),
+                .help("IP address or hostname (for Kerberos) of the LDAP server"),
         )
         .arg(
             Arg::new("domain")
                 .short('d')
                 .long("domain")
+                .required(true)
                 .help("FQDN of the domain to which the LDAP server belongs"),
+        )
+        .arg(
+            Arg::new("kerberos")
+                .short('k')
+                .long("kerberos")
+                .required(false)
+                .action(clap::ArgAction::SetTrue)
+                .help("Use Kerberos (GSSAPI) for authentication. Useful when signing is enforced. Only available on Linux at this time."),
+        )
+        .arg(
+            Arg::new("ldaps")
+                .short('s')
+                .long("ldaps")
+                .required(false)
+                .action(clap::ArgAction::SetTrue)
+                .help("Use LDAPS (LDAP over SSL)"),
         )
         .get_matches();
 
@@ -63,8 +77,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     let dn = domain_to_base_dn(args.get_one::<String>("domain").unwrap().as_str());
 
     /*
-            ***LDAP SECTION***
-    */
+     ***LDAP SECTION***
+     */
+
+    let gssapi = args.get_one::<bool>("kerberos").unwrap().to_owned();
+    let use_tls = args.get_one::<bool>("ldaps").unwrap().to_owned();
 
     // LDAP configuration
     let config = LdapConfig::new(
@@ -73,8 +90,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         args.get_one::<String>("domain").unwrap().to_string(),
         args.get_one::<String>("password").unwrap().to_string(),
     )
-    .with_port(389)                      // LDAP standard port
+    .with_port(389) // LDAP standard port
+    .with_gssapi(gssapi)
+    .with_tls(use_tls)
     .with_base_dn(dn.to_string()); // DN base
+
+    /*if args.get_one::<bool>("ldaps").unwrap().to_owned() {
+        config.with_tls(true);
+    }*/
 
     // LDAP client building
     let mut client = LdapClient::new(config);
@@ -96,7 +119,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         Ok(results) => {
             print_search_results(&results);
             results_store = results.clone();
-        },
+        }
         Err(e) => {
             log::error!("Search failed: {}", e);
             return Err(e);
@@ -110,18 +133,21 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     #[cfg(target_os = "linux")]
     {
+        use smb_utils::{print_shares /*, print_share_content*/, SmbClient, SmbConfig};
+
         /*
-                ***SMB SECTION***
-        */
+         ***SMB SECTION***
+         */
 
         // SMB configuration
         let mut wds_fqdn = String::new();
         for (_, entry) in results_store.iter().enumerate() {
             for (attr, values) in &entry.attrs {
                 if attr == "netbootServer" {
-                    println!("{}",extract_cn_value(values[0].as_str()).unwrap());
+                    println!("{}", extract_cn_value(values[0].as_str()).unwrap());
                     wds_fqdn.push_str(extract_cn_value(values[0].as_str()).unwrap().as_str());
-                    wds_fqdn.push_str(&(".".to_string() + args.get_one::<String>("domain").unwrap()));
+                    wds_fqdn
+                        .push_str(&(".".to_string() + args.get_one::<String>("domain").unwrap()));
                 }
             }
         }
@@ -129,7 +155,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             wds_fqdn.to_string(),
             args.get_one::<String>("username").unwrap().to_string(),
             args.get_one::<String>("domain").unwrap().to_string(),
-            args.get_one::<String>("password").unwrap().to_string()
+            args.get_one::<String>("password").unwrap().to_string(),
         )
         .with_port(445);
 
@@ -140,12 +166,12 @@ fn main() -> Result<(), Box<dyn Error>> {
         match smb_client.test_connection() {
             Ok(true) => {
                 log::info!("SMB connection successful!");
-                
+
                 // List shares
                 match smb_client.list_shares() {
                     Ok(shares) => {
                         print_shares(&shares);
-                        
+
                         // Access to the share content
                         /*if let Some(first_share) = shares.first() {
                             if first_share.share_type == "Disk" {
